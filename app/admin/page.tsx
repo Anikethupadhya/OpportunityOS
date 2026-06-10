@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/db";
+import ScanButton from "./ScanButton";
 
 interface ProblemCluster {
   id: string;
@@ -14,6 +15,16 @@ interface ProblemCluster {
   rejection_reason: string | null;
 }
 
+interface ScanRun {
+  id: string;
+  ran_at: string;
+  sources: string[] | null;
+  posts_fetched: number;
+  tier2_passes: number;
+  new_clusters: number;
+  ai_cost_usd: number;
+}
+
 export default async function AdminPage() {
   const db = createServiceClient();
 
@@ -22,15 +33,21 @@ export default async function AdminPage() {
     { data: opps },
     { data: clusters },
     { data: clusterOpps },
+    { data: scanRuns },
   ] = await Promise.all([
     db.from("ai_usage_log").select("cost_usd, model, opportunity_id, created_at"),
     db.from("opportunities").select("revenue_actual").gt("revenue_actual", 0),
     db.from("problem_clusters").select("*").order("created_at", { ascending: false }),
     db
       .from("opportunities")
-      .select("id, cluster_id")
+      .select("id, cluster_id, source_type")
       .not("cluster_id", "is", null)
       .neq("status", "rejected"),
+    db
+      .from("scan_runs")
+      .select("id, ran_at, sources, posts_fetched, tier2_passes, new_clusters, ai_cost_usd")
+      .order("ran_at", { ascending: false })
+      .limit(5),
   ]);
 
   // Build signal count map
@@ -40,6 +57,7 @@ export default async function AdminPage() {
   }
 
   const clusterList = (clusters ?? []) as ProblemCluster[];
+  const scanRunList = (scanRuns ?? []) as ScanRun[];
 
   // Block 1: review status summary
   const totalClusters = clusterList.length;
@@ -50,6 +68,34 @@ export default async function AdminPage() {
   const maybeCount = clusterList.filter((c) => c.human_status === "maybe").length;
   const wouldNotBuildCount = clusterList.filter((c) => c.human_status === "would_not_build").length;
   const wouldBuildRate = reviewedCount > 0 ? (wouldBuildCount / reviewedCount) * 100 : null;
+
+  // WBR by source: a reviewed cluster counts toward every source that contributed a
+  // signal to it (mirrors COUNT(DISTINCT cluster) GROUP BY source_type). Tells us which
+  // source produces build-worthy opportunities so future sessions add more like it.
+  const clusterSources: Record<string, Set<string>> = {};
+  for (const opp of (clusterOpps ?? []) as Array<{
+    cluster_id: string;
+    source_type: string | null;
+  }>) {
+    const src = opp.source_type ?? "unknown";
+    (clusterSources[opp.cluster_id] ??= new Set()).add(src);
+  }
+  const sourceWbrMap: Record<string, { reviewed: number; wouldBuild: number }> = {};
+  for (const c of reviewedClusters) {
+    for (const src of clusterSources[c.id] ?? []) {
+      const entry = (sourceWbrMap[src] ??= { reviewed: 0, wouldBuild: 0 });
+      entry.reviewed++;
+      if (c.human_status === "would_build") entry.wouldBuild++;
+    }
+  }
+  const sourceWbr = Object.entries(sourceWbrMap)
+    .map(([source, { reviewed, wouldBuild }]) => ({
+      source,
+      reviewed,
+      wouldBuild,
+      wbr: reviewed > 0 ? (wouldBuild / reviewed) * 100 : 0,
+    }))
+    .sort((a, b) => b.wbr - a.wbr);
 
   // Block 2: rejection reason breakdown
   const rejectedClusters = clusterList.filter((c) => c.human_status === "would_not_build");
@@ -182,6 +228,79 @@ export default async function AdminPage() {
             {wouldBuildCount} of {reviewedCount} reviewed marked Would Build
           </p>
         </div>
+
+        {/* WBR by source */}
+        <div className="space-y-2 border-t pt-4">
+          <h3 className="text-sm font-semibold">WBR by Source</h3>
+          {sourceWbr.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No reviewed clusters yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b">
+                  <th className="text-left pb-2 font-medium">Source</th>
+                  <th className="text-right pb-2 font-medium">Reviewed</th>
+                  <th className="text-right pb-2 font-medium">Would Build</th>
+                  <th className="text-right pb-2 font-medium">WBR</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {sourceWbr.map((s) => (
+                  <tr key={s.source}>
+                    <td className="py-2 font-mono text-xs">{s.source}</td>
+                    <td className="py-2 text-right">{s.reviewed}</td>
+                    <td className="py-2 text-right">{s.wouldBuild}</td>
+                    <td className="py-2 text-right font-medium">{s.wbr.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </section>
+
+      {/* Run Scan */}
+      <ScanButton />
+
+      {/* Scan History */}
+      <section className="border rounded-xl p-5 space-y-3">
+        <h2 className="font-semibold">Scan History</h2>
+        {scanRunList.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No scans recorded yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b">
+                  <th className="text-left pb-2 font-medium">When</th>
+                  <th className="text-left pb-2 font-medium">Sources</th>
+                  <th className="text-right pb-2 font-medium">Fetched</th>
+                  <th className="text-right pb-2 font-medium">Tier 2</th>
+                  <th className="text-right pb-2 font-medium">Clusters</th>
+                  <th className="text-right pb-2 font-medium">AI cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {scanRunList.map((run) => (
+                  <tr key={run.id}>
+                    <td className="py-2 whitespace-nowrap">
+                      {new Date(run.ran_at).toLocaleString()}
+                    </td>
+                    <td className="py-2 text-muted-foreground">
+                      {(run.sources ?? []).join(", ") || "—"}
+                    </td>
+                    <td className="py-2 text-right">{run.posts_fetched}</td>
+                    <td className="py-2 text-right">{run.tier2_passes}</td>
+                    <td className="py-2 text-right">{run.new_clusters}</td>
+                    <td className="py-2 text-right font-mono text-xs">
+                      ${Number(run.ai_cost_usd).toFixed(4)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {/* Spend */}

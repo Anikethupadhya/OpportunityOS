@@ -21,8 +21,9 @@ const SUBREDDITS = [
 const MAX_PER_SUBREDDIT = 200;
 const MAX_TOTAL = 1200;
 
-// Tier 1: broad first gate — cheap, eliminates clearly irrelevant posts
-const CANDIDATE_KEYWORDS = [
+// Tier 1: broad first gate — cheap, eliminates clearly irrelevant posts.
+// Exported so other sources (e.g. Hacker News) apply the exact same filter.
+export const CANDIDATE_KEYWORDS = [
   "struggling with",
   "frustrated with",
   "sick of",
@@ -54,7 +55,8 @@ const CANDIDATE_KEYWORDS = [
 // Tier 2: strict product/opportunity intent — must also match at least one of these.
 // Session 5: tightened toward business-operator / client-facing pain. Each phrase below
 // is either a purchase signal, an explicit tool search, or a named workflow friction.
-const HIGH_INTENT_PHRASES = [
+// Exported so other sources (e.g. Hacker News) apply the exact same filter.
+export const HIGH_INTENT_PHRASES = [
   "I'd pay for",
   "would pay for",
   "does anyone know a tool",
@@ -85,6 +87,45 @@ interface RedditPost {
   selftext: string;
   permalink: string;
   subreddit: string;
+}
+
+// Per-source diagnostics block (keyed by subreddit for Reddit, by "hackernews" for HN).
+export interface SourceDiagnostics {
+  fetchedNew: number;
+  fetchedTop: number;
+  mergedUnique: number;
+  candidates: number;
+  rejected: number;
+  skipped: number;
+  inserted: number;
+}
+
+// Shared return shape for every signal source so results can be merged uniformly.
+export interface ScanResult {
+  discovered: number;
+  skipped: number;
+  rejected: number;
+  titles: string[];
+  rawFetchedNew: number;
+  rawFetchedTop: number;
+  mergedUnique: number;
+  diagnostics: Record<string, SourceDiagnostics>;
+  clustering_processed: number;
+  clustering_clustered: number;
+  clustering_failed: number;
+  clustering_new_clusters: number;
+}
+
+// Tier 1 match on arbitrary text — the single source of truth for candidate detection.
+export function matchesCandidateText(text: string): boolean {
+  const lower = text.toLowerCase();
+  return CANDIDATE_KEYWORDS.some((kw) => lower.includes(kw.toLowerCase()));
+}
+
+// Tier 2 match on arbitrary text — returns the matched high-intent phrase, or null.
+export function matchHighIntentText(text: string): string | null {
+  const lower = text.toLowerCase();
+  return HIGH_INTENT_PHRASES.find((kw) => lower.includes(kw.toLowerCase())) ?? null;
 }
 
 function decodeHtmlEntities(str: string): string {
@@ -158,38 +199,15 @@ async function fetchFeed(subreddit: string, url: string): Promise<RedditPost[]> 
 }
 
 function isCandidate(post: RedditPost): boolean {
-  const text = `${post.title} ${post.selftext}`.toLowerCase();
-  return CANDIDATE_KEYWORDS.some((kw) => text.includes(kw.toLowerCase()));
+  return matchesCandidateText(`${post.title} ${post.selftext}`);
 }
 
 // Returns the matched Tier 2 phrase, or null if none matched.
 function matchHighIntent(post: RedditPost): string | null {
-  const text = `${post.title} ${post.selftext}`.toLowerCase();
-  return HIGH_INTENT_PHRASES.find((kw) => text.includes(kw.toLowerCase())) ?? null;
+  return matchHighIntentText(`${post.title} ${post.selftext}`);
 }
 
-export async function scanReddit(): Promise<{
-  discovered: number;
-  skipped: number;
-  rejected: number;
-  titles: string[];
-  rawFetchedNew: number;
-  rawFetchedTop: number;
-  mergedUnique: number;
-  diagnostics: Record<string, {
-    fetchedNew: number;
-    fetchedTop: number;
-    mergedUnique: number;
-    candidates: number;
-    rejected: number;
-    skipped: number;
-    inserted: number;
-  }>;
-  clustering_processed: number;
-  clustering_clustered: number;
-  clustering_failed: number;
-  clustering_new_clusters: number;
-}> {
+export async function scanReddit(): Promise<ScanResult> {
   const db = createServiceClient();
   const discovered: string[] = [];
   let skippedCount = 0;
@@ -199,15 +217,7 @@ export async function scanReddit(): Promise<{
   let totalMergedUnique = 0;
   let totalProcessed = 0;
 
-  const diagnostics: Record<string, {
-    fetchedNew: number;
-    fetchedTop: number;
-    mergedUnique: number;
-    candidates: number;
-    rejected: number;
-    skipped: number;
-    inserted: number;
-  }> = {};
+  const diagnostics: Record<string, SourceDiagnostics> = {};
 
   for (const subreddit of SUBREDDITS) {
     // Enforce total cap across all subreddits
@@ -400,4 +410,55 @@ export async function scanReddit(): Promise<{
     clustering_failed: clusteringResult.failed,
     clustering_new_clusters: clusteringResult.new_clusters,
   };
+}
+
+// Approximate the AI cost of the just-finished scan by summing ai_usage_log rows
+// written in the recent window. Not exact (a concurrent scan would overlap), but
+// good enough to surface per-scan spend without changing logAiUsage().
+export async function sumRecentAiCost(windowMinutes = 2): Promise<number> {
+  try {
+    const db = createServiceClient();
+    const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();
+    const { data, error } = await db
+      .from("ai_usage_log")
+      .select("cost_usd")
+      .gte("created_at", since);
+    if (error) {
+      console.error("[scan] failed to sum recent AI cost:", error);
+      return 0;
+    }
+    return (data ?? []).reduce((s, r) => s + Number(r.cost_usd), 0);
+  } catch (err) {
+    console.error("[scan] sumRecentAiCost threw:", err);
+    return 0;
+  }
+}
+
+// Persist one scan_runs row. Called from the cron route after Reddit + HN results
+// are merged, since the combined totals are only known there. A logging failure
+// must never break the scan, so the insert is wrapped in try/catch.
+export async function recordScanRun(run: {
+  ran_at?: string;
+  sources: string[];
+  posts_fetched: number;
+  tier2_passes: number;
+  new_clusters: number;
+  ai_cost_usd: number;
+  result_json?: unknown;
+}): Promise<void> {
+  try {
+    const db = createServiceClient();
+    const { error } = await db.from("scan_runs").insert({
+      ran_at: run.ran_at ?? new Date().toISOString(),
+      sources: run.sources,
+      posts_fetched: run.posts_fetched,
+      tier2_passes: run.tier2_passes,
+      new_clusters: run.new_clusters,
+      ai_cost_usd: run.ai_cost_usd,
+      result_json: run.result_json ?? null,
+    });
+    if (error) console.error("[scan] failed to record scan run:", error);
+  } catch (err) {
+    console.error("[scan] recordScanRun threw:", err);
+  }
 }
