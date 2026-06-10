@@ -2,6 +2,8 @@ import { createServiceClient } from "@/lib/db";
 import ClusterStatusButtons from "./ClusterStatusButtons";
 import ExampleHint from "./ExampleHint";
 import OfferGate from "./OfferGate";
+import ResearchButton from "./ResearchButton";
+import ResearchReport from "./ResearchReport";
 
 interface ProblemCluster {
   id: string;
@@ -17,6 +19,8 @@ interface ProblemCluster {
   rejection_reason: string | null;
   offer_status: string | null;
   offer_notes: string | null;
+  research_status: string | null;
+  research_notes: string | null;
 }
 
 interface OpportunityRow {
@@ -164,6 +168,21 @@ export default async function ProblemsPage() {
                   Offer: Approved
                 </span>
               )}
+              {cluster.research_status === "pending" && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-yellow-100 text-yellow-800 border border-yellow-300 whitespace-nowrap">
+                  Researching...
+                </span>
+              )}
+              {cluster.research_status === "complete" && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-blue-100 text-blue-800 border border-blue-300 whitespace-nowrap">
+                  Research Ready
+                </span>
+              )}
+              {cluster.research_status === "failed" && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-red-100 text-red-800 border border-red-300 whitespace-nowrap">
+                  Research Failed
+                </span>
+              )}
             </div>
 
             {/* Metadata row */}
@@ -206,6 +225,16 @@ export default async function ProblemsPage() {
             {/* Example signal hint — collapsed by default, expand on click */}
             {cluster.example_hint && <ExampleHint hint={cluster.example_hint} />}
 
+            {/* Research — run it, or read the report once complete */}
+            {(cluster.research_status === null || cluster.research_status === "failed") && (
+              <div className="mt-3">
+                <ResearchButton clusterId={cluster.id} />
+              </div>
+            )}
+            {cluster.research_status === "complete" && cluster.research_notes && (
+              <ResearchReport notes={cluster.research_notes} />
+            )}
+
             {/* Status buttons */}
             <ClusterStatusButtons
               clusterId={cluster.id}
@@ -219,6 +248,8 @@ export default async function ProblemsPage() {
                 clusterId={cluster.id}
                 initialOfferStatus={cluster.offer_status}
                 initialOfferNotes={cluster.offer_notes}
+                researchNotes={cluster.research_notes}
+                researchStatus={cluster.research_status}
               />
             )}
           </div>

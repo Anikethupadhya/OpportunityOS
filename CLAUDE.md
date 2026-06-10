@@ -59,6 +59,7 @@ Successful products inform future cluster scoring
 ✅ Mandatory rejection reasons (enforced front + back)
 ✅ Rejection feedback loop (rejection_reason column)
 ✅ Offer Gate on /problems (would_build clusters → 5-question offer form → draft/approved)
+✅ Cluster research via web search (Sonnet web_search tool → report + offer pre-fill; hourly cron gated behind RESEARCH_AUTO_ENABLED=true)
 ✅ Analytics dashboard (/admin) — spend, cluster review, rejection breakdown
 ✅ AI usage logging (ai_usage_log table)
 ✅ Revenue tracking (manual, revenue_events table)
@@ -154,6 +155,9 @@ rejection_reason text          — too_vague | single_person_problem | too_satur
                                   not_monetizable | already_solved | bad_signal
 offer_status text              — NULL | draft | approved (CHECK constraint) — build gate
 offer_notes text               — 5 offer answers, "label: answer" newline-separated
+research_status text           — NULL | pending | complete | failed (CHECK constraint)
+research_notes text            — web-search research report + ---OFFER_SUGGESTIONS--- block
+research_at timestamptz
 created_at timestamptz
 ```
 
