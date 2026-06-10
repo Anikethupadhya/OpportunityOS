@@ -51,12 +51,14 @@ Successful products inform future cluster scoring
 
 ```
 ✅ Reddit RSS scanning (6 subreddits, Day 5 → 10)
+✅ Hacker News scanning (Algolia API, ask_hn, same Tier 1/2 filters)
 ✅ Tier 1/2 filtering + DB dedup
 ✅ AI clustering via Sonnet (BRIEF_MODEL)
 ✅ Human review UI (/problems page)
 ✅ Would Build / Maybe / No status buttons
 ✅ Mandatory rejection reasons (enforced front + back)
 ✅ Rejection feedback loop (rejection_reason column)
+✅ Offer Gate on /problems (would_build clusters → 5-question offer form → draft/approved)
 ✅ Analytics dashboard (/admin) — spend, cluster review, rejection breakdown
 ✅ AI usage logging (ai_usage_log table)
 ✅ Revenue tracking (manual, revenue_events table)
@@ -75,6 +77,7 @@ Successful products inform future cluster scoring
 
 | Metric | Value |
 |--------|-------|
+| Signal sources | Reddit + Hacker News |
 | Subreddits active | 10 |
 | Clusters in DB | 6 |
 | Reviewed | 6 / 6 |
@@ -149,6 +152,8 @@ human_status text              — would_build | would_not_build | maybe | NULL
 reviewed_at timestamptz
 rejection_reason text          — too_vague | single_person_problem | too_saturated |
                                   not_monetizable | already_solved | bad_signal
+offer_status text              — NULL | draft | approved (CHECK constraint) — build gate
+offer_notes text               — 5 offer answers, "label: answer" newline-separated
 created_at timestamptz
 ```
 
