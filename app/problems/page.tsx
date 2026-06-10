@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/db";
 import ClusterStatusButtons from "./ClusterStatusButtons";
 import ExampleHint from "./ExampleHint";
+import OfferGate from "./OfferGate";
 
 interface ProblemCluster {
   id: string;
@@ -14,6 +15,8 @@ interface ProblemCluster {
   reviewed_at: string | null;
   created_at: string | null;
   rejection_reason: string | null;
+  offer_status: string | null;
+  offer_notes: string | null;
 }
 
 interface OpportunityRow {
@@ -151,6 +154,16 @@ export default async function ProblemsPage() {
               <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-purple-100 text-purple-800 border border-purple-300 whitespace-nowrap">
                 Signals: {cluster.signal_count}
               </span>
+              {cluster.offer_status === "draft" && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-yellow-100 text-yellow-800 border border-yellow-300 whitespace-nowrap">
+                  Offer: Draft
+                </span>
+              )}
+              {cluster.offer_status === "approved" && (
+                <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-green-100 text-green-800 border border-green-300 whitespace-nowrap">
+                  Offer: Approved
+                </span>
+              )}
             </div>
 
             {/* Metadata row */}
@@ -199,6 +212,15 @@ export default async function ProblemsPage() {
               initialStatus={cluster.human_status}
               initialRejectionReason={cluster.rejection_reason}
             />
+
+            {/* Offer Gate — the bridge between "pain exists" and "someone pays" */}
+            {cluster.human_status === "would_build" && (
+              <OfferGate
+                clusterId={cluster.id}
+                initialOfferStatus={cluster.offer_status}
+                initialOfferNotes={cluster.offer_notes}
+              />
+            )}
           </div>
         ))}
 
