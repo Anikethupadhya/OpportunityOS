@@ -114,12 +114,75 @@ export default async function AdminPage() {
     return `$${n.toFixed(4)}`;
   }
 
+  // Validation gate: unlock angle generation at ≥30 reviewed clusters AND ≥50% WBR.
+  const REVIEW_TARGET = 30;
+  const WBR_TARGET = 50;
+  const wbrValue = wouldBuildRate ?? 0;
+  const wbrFillPct = Math.min(100, (wbrValue / WBR_TARGET) * 100);
+  const reviewFillPct = Math.min(100, (reviewedCount / REVIEW_TARGET) * 100);
+  const gateUnlocked = reviewedCount >= REVIEW_TARGET && wbrValue >= WBR_TARGET;
+
   return (
     <div className="max-w-3xl mx-auto py-8 px-4 space-y-8">
       <div>
         <h1 className="text-2xl font-bold">Admin</h1>
         <p className="text-sm text-muted-foreground mt-1">AI spend and business validation metrics.</p>
       </div>
+
+      {/* Validation Gate */}
+      <section className="border rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-semibold">Validation Gate</h2>
+          <span
+            className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold border ${
+              gateUnlocked
+                ? "bg-green-100 text-green-800 border-green-300"
+                : "bg-gray-100 text-gray-700 border-gray-300"
+            }`}
+          >
+            {gateUnlocked
+              ? "UNLOCKED — angle generation available"
+              : `LOCKED — need ≥${REVIEW_TARGET} reviewed + ≥${WBR_TARGET}% WBR`}
+          </span>
+        </div>
+
+        {/* Reviewed progress */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Clusters reviewed</span>
+            <span className="font-medium">
+              {reviewedCount} / {REVIEW_TARGET}
+            </span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all"
+              style={{ width: `${reviewFillPct}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Would Build Rate progress toward 50% target */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Would Build Rate (target {WBR_TARGET}%)</span>
+            <span className="font-medium">
+              {wouldBuildRate !== null ? `${wouldBuildRate.toFixed(1)}%` : "—"}
+            </span>
+          </div>
+          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all ${
+                gateUnlocked ? "bg-green-500" : "bg-yellow-500"
+              }`}
+              style={{ width: `${wbrFillPct}%` }}
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {wouldBuildCount} of {reviewedCount} reviewed marked Would Build
+          </p>
+        </div>
+      </section>
 
       {/* Spend */}
       <section className="border rounded-xl p-5 space-y-4">
