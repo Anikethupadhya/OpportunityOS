@@ -433,3 +433,32 @@ export async function sumRecentAiCost(windowMinutes = 2): Promise<number> {
     return 0;
   }
 }
+
+// Persist one scan_runs row. Called from the cron route after Reddit + HN results
+// are merged, since the combined totals are only known there. A logging failure
+// must never break the scan, so the insert is wrapped in try/catch.
+export async function recordScanRun(run: {
+  ran_at?: string;
+  sources: string[];
+  posts_fetched: number;
+  tier2_passes: number;
+  new_clusters: number;
+  ai_cost_usd: number;
+  result_json?: unknown;
+}): Promise<void> {
+  try {
+    const db = createServiceClient();
+    const { error } = await db.from("scan_runs").insert({
+      ran_at: run.ran_at ?? new Date().toISOString(),
+      sources: run.sources,
+      posts_fetched: run.posts_fetched,
+      tier2_passes: run.tier2_passes,
+      new_clusters: run.new_clusters,
+      ai_cost_usd: run.ai_cost_usd,
+      result_json: run.result_json ?? null,
+    });
+    if (error) console.error("[scan] failed to record scan run:", error);
+  } catch (err) {
+    console.error("[scan] recordScanRun threw:", err);
+  }
+}

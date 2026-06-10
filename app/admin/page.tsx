@@ -15,6 +15,16 @@ interface ProblemCluster {
   rejection_reason: string | null;
 }
 
+interface ScanRun {
+  id: string;
+  ran_at: string;
+  sources: string[] | null;
+  posts_fetched: number;
+  tier2_passes: number;
+  new_clusters: number;
+  ai_cost_usd: number;
+}
+
 export default async function AdminPage() {
   const db = createServiceClient();
 
@@ -23,15 +33,21 @@ export default async function AdminPage() {
     { data: opps },
     { data: clusters },
     { data: clusterOpps },
+    { data: scanRuns },
   ] = await Promise.all([
     db.from("ai_usage_log").select("cost_usd, model, opportunity_id, created_at"),
     db.from("opportunities").select("revenue_actual").gt("revenue_actual", 0),
     db.from("problem_clusters").select("*").order("created_at", { ascending: false }),
     db
       .from("opportunities")
-      .select("id, cluster_id")
+      .select("id, cluster_id, source_type")
       .not("cluster_id", "is", null)
       .neq("status", "rejected"),
+    db
+      .from("scan_runs")
+      .select("id, ran_at, sources, posts_fetched, tier2_passes, new_clusters, ai_cost_usd")
+      .order("ran_at", { ascending: false })
+      .limit(5),
   ]);
 
   // Build signal count map
@@ -41,6 +57,7 @@ export default async function AdminPage() {
   }
 
   const clusterList = (clusters ?? []) as ProblemCluster[];
+  const scanRunList = (scanRuns ?? []) as ScanRun[];
 
   // Block 1: review status summary
   const totalClusters = clusterList.length;
@@ -187,6 +204,47 @@ export default async function AdminPage() {
 
       {/* Run Scan */}
       <ScanButton />
+
+      {/* Scan History */}
+      <section className="border rounded-xl p-5 space-y-3">
+        <h2 className="font-semibold">Scan History</h2>
+        {scanRunList.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No scans recorded yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b">
+                  <th className="text-left pb-2 font-medium">When</th>
+                  <th className="text-left pb-2 font-medium">Sources</th>
+                  <th className="text-right pb-2 font-medium">Fetched</th>
+                  <th className="text-right pb-2 font-medium">Tier 2</th>
+                  <th className="text-right pb-2 font-medium">Clusters</th>
+                  <th className="text-right pb-2 font-medium">AI cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {scanRunList.map((run) => (
+                  <tr key={run.id}>
+                    <td className="py-2 whitespace-nowrap">
+                      {new Date(run.ran_at).toLocaleString()}
+                    </td>
+                    <td className="py-2 text-muted-foreground">
+                      {(run.sources ?? []).join(", ") || "—"}
+                    </td>
+                    <td className="py-2 text-right">{run.posts_fetched}</td>
+                    <td className="py-2 text-right">{run.tier2_passes}</td>
+                    <td className="py-2 text-right">{run.new_clusters}</td>
+                    <td className="py-2 text-right font-mono text-xs">
+                      ${Number(run.ai_cost_usd).toFixed(4)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
       {/* Spend */}
       <section className="border rounded-xl p-5 space-y-4">

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { scanReddit, sumRecentAiCost } from "@/lib/reddit";
+import { scanReddit, sumRecentAiCost, recordScanRun } from "@/lib/reddit";
 import { scanHackerNews } from "@/lib/hackernews";
 import { runClusteringPass } from "@/lib/clustering";
 
@@ -30,7 +30,7 @@ async function runScan() {
   const new_clusters = reddit.clustering_new_clusters + extraNewClusters;
   const ai_cost_usd = await sumRecentAiCost();
 
-  return {
+  const merged = {
     ran_at,
     sources,
     posts_fetched,
@@ -40,6 +40,19 @@ async function runScan() {
     reddit,
     hackernews,
   };
+
+  // Persist the run for the Scan History table (never throws).
+  await recordScanRun({
+    ran_at,
+    sources,
+    posts_fetched,
+    tier2_passes,
+    new_clusters,
+    ai_cost_usd,
+    result_json: merged,
+  });
+
+  return merged;
 }
 
 export async function GET(request: NextRequest) {
