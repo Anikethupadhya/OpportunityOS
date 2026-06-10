@@ -1,4 +1,5 @@
 import { createServiceClient } from "@/lib/db";
+import ScanButton from "./ScanButton";
 
 interface ProblemCluster {
   id: string;
@@ -183,6 +184,9 @@ export default async function AdminPage() {
           </p>
         </div>
       </section>
+
+      {/* Run Scan */}
+      <ScanButton />
 
       {/* Spend */}
       <section className="border rounded-xl p-5 space-y-4">
