@@ -1,0 +1,11 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/reddit",
+      "schedule": "0 */4 * * *"
+    }
+  ],
+  "functions": {
+    "app/api/cron/reddit/route.ts": { "maxDuration": 60 }
+  }
+}
