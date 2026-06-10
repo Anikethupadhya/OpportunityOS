@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/db";
 import ClusterStatusButtons from "./ClusterStatusButtons";
+import ExampleHint from "./ExampleHint";
 
 interface ProblemCluster {
   id: string;
@@ -26,6 +27,7 @@ interface OpportunityRow {
 interface ClusterWithSignals extends ProblemCluster {
   signal_count: number;
   evidence: Array<{ title: string; source_url: string | null }>;
+  example_hint: string | null;
 }
 
 function formatDate(iso: string | null): string {
@@ -35,6 +37,20 @@ function formatDate(iso: string | null): string {
     day: "numeric",
     year: "numeric",
   });
+}
+
+// Colored specificity badge: 1–2 = too broad, 3 = moderate, 4–5 = specific.
+function specificityBadge(specificity: number | null): { label: string; cls: string } {
+  if (specificity === null) {
+    return { label: "Unknown", cls: "bg-gray-100 text-gray-700 border-gray-300" };
+  }
+  if (specificity <= 2) {
+    return { label: "Too broad", cls: "bg-orange-100 text-orange-800 border-orange-300" };
+  }
+  if (specificity === 3) {
+    return { label: "Moderate", cls: "bg-yellow-100 text-yellow-800 border-yellow-300" };
+  }
+  return { label: "Specific", cls: "bg-green-100 text-green-800 border-green-300" };
 }
 
 export default async function ProblemsPage() {
@@ -72,6 +88,7 @@ export default async function ProblemsPage() {
   // Step C: build maps in JS
   const countMap: Record<string, number> = {};
   const evidenceMap: Record<string, Array<{ title: string; source_url: string | null }>> = {};
+  const hintMap: Record<string, string> = {};
 
   for (const opp of (opps ?? []) as OpportunityRow[]) {
     const cid = opp.cluster_id;
@@ -80,12 +97,17 @@ export default async function ProblemsPage() {
     if (evidenceMap[cid].length < 5) {
       evidenceMap[cid].push({ title: opp.title, source_url: opp.source_url });
     }
+    // Keep the first non-empty raw_problem_hint seen for this cluster.
+    if (!hintMap[cid] && opp.raw_problem_hint) {
+      hintMap[cid] = opp.raw_problem_hint;
+    }
   }
 
   const enriched: ClusterWithSignals[] = ((clusters ?? []) as ProblemCluster[]).map((c) => ({
     ...c,
     signal_count: countMap[c.id] ?? 0,
     evidence: evidenceMap[c.id] ?? [],
+    example_hint: hintMap[c.id] ?? null,
   }));
 
   // Sort: signal_count DESC, then last_seen_at DESC
@@ -116,9 +138,16 @@ export default async function ProblemsPage() {
               <h2 className="text-base font-bold text-foreground flex-1 min-w-0">
                 {cluster.canonical_name}
               </h2>
-              <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-blue-100 text-blue-800 border border-blue-300 whitespace-nowrap">
-                Specificity: {cluster.specificity ?? "—"}/5
-              </span>
+              {(() => {
+                const badge = specificityBadge(cluster.specificity);
+                return (
+                  <span
+                    className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold border whitespace-nowrap ${badge.cls}`}
+                  >
+                    Specificity {cluster.specificity ?? "—"}/5 · {badge.label}
+                  </span>
+                );
+              })()}
               <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-semibold bg-purple-100 text-purple-800 border border-purple-300 whitespace-nowrap">
                 Signals: {cluster.signal_count}
               </span>
@@ -160,6 +189,9 @@ export default async function ProblemsPage() {
                 <p className="text-sm text-muted-foreground">No linked signals yet</p>
               )}
             </div>
+
+            {/* Example signal hint — collapsed by default, expand on click */}
+            {cluster.example_hint && <ExampleHint hint={cluster.example_hint} />}
 
             {/* Status buttons */}
             <ClusterStatusButtons
