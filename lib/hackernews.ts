@@ -147,7 +147,7 @@ export async function scanHackerNews(): Promise<ScanResult> {
     const { error } = await db.from("opportunities").insert({
       title,
       summary,
-      source_type: "hackernews",
+      source_type: "hn",
       source_url: urlFor(hit.objectID),
       source_raw: `${hit.title}\n\n${hit.story_text ?? ""}`,
       category: "digital_product",
@@ -177,7 +177,7 @@ export async function scanHackerNews(): Promise<ScanResult> {
       .insert({
         title,
         summary,
-        source_type: "hackernews",
+        source_type: "hn",
         source_url: urlFor(hit.objectID),
         source_raw: `${hit.title}\n\n${hit.story_text ?? ""}`,
         category: "digital_product",
@@ -201,7 +201,7 @@ export async function scanHackerNews(): Promise<ScanResult> {
       const scores = await scoreOpportunity({
         title: opp.title,
         summary: opp.summary,
-        source_type: "hackernews",
+        source_type: "hn",
         source_raw: opp.source_raw,
         category: "digital_product",
         opportunityId: opp.id,

@@ -20,7 +20,8 @@ async function runScan() {
   }
 
   const ran_at = new Date().toISOString();
-  const sources = ["reddit", "hackernews"];
+  // "hn" matches the opportunities.source_type CHECK constraint and the WBR-by-source table.
+  const sources = ["reddit", "hn"];
   const posts_fetched =
     reddit.rawFetchedNew +
     reddit.rawFetchedTop +
