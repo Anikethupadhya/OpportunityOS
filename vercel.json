@@ -3,9 +3,14 @@
     {
       "path": "/api/cron/reddit",
       "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/cron/research",
+      "schedule": "0 * * * *"
     }
   ],
   "functions": {
-    "app/api/cron/reddit/route.ts": { "maxDuration": 60 }
+    "app/api/cron/reddit/route.ts": { "maxDuration": 60 },
+    "app/api/cron/research/route.ts": { "maxDuration": 120 }
   }
 }

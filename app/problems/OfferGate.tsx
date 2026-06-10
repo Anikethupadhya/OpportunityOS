@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const OFFER_QUESTIONS = [
@@ -49,21 +49,44 @@ function buildOfferNotes(answers: string[]): string {
   return OFFER_QUESTIONS.map((q, i) => `${q.label}: ${answers[i].trim()}`).join("\n");
 }
 
+// Research reports end with a ---OFFER_SUGGESTIONS--- block of KEY: value lines,
+// in the same order as OFFER_QUESTIONS. Values may be wrapped in [brackets].
+const OFFER_SUGGESTION_KEYS = ["BUYER", "JOB", "FORMAT", "WHY_PAY", "WHY_FAIL"];
+
+function parseOfferSuggestions(research: string | null): string[] | null {
+  if (!research) return null;
+  const idx = research.indexOf("---OFFER_SUGGESTIONS---");
+  if (idx === -1) return null;
+  const block = research.slice(idx);
+  return OFFER_SUGGESTION_KEYS.map((key) => {
+    const m = block.match(new RegExp(`^${key}:\\s*(.+)$`, "m"));
+    return m ? m[1].trim().replace(/^\[/, "").replace(/\]$/, "").trim() : "";
+  });
+}
+
 interface OfferGateProps {
   clusterId: string;
   initialOfferStatus: string | null;
   initialOfferNotes: string | null;
+  researchNotes?: string | null;
+  researchStatus?: string | null;
 }
 
 export default function OfferGate({
   clusterId,
   initialOfferStatus,
   initialOfferNotes,
+  researchNotes = null,
+  researchStatus = null,
 }: OfferGateProps) {
   const router = useRouter();
-  const [answers, setAnswers] = useState<string[]>(() =>
-    parseOfferNotes(initialOfferNotes)
-  );
+  const suggestions = useMemo(() => parseOfferSuggestions(researchNotes), [researchNotes]);
+  // Saved answers always win; research suggestions only fill fields that are empty.
+  const [answers, setAnswers] = useState<string[]>(() => {
+    const saved = parseOfferNotes(initialOfferNotes);
+    if (!suggestions) return saved;
+    return saved.map((a, i) => (a.trim() === "" ? suggestions[i] : a));
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,6 +119,16 @@ export default function OfferGate({
       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
         Offer Gate
       </p>
+
+      {researchStatus === "complete" && suggestions ? (
+        <p className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded-md px-2.5 py-1.5 mb-3">
+          Pre-filled from research — review and edit before approving.
+        </p>
+      ) : researchStatus === null || researchStatus === "failed" ? (
+        <p className="text-xs text-muted-foreground bg-muted/50 border border-border rounded-md px-2.5 py-1.5 mb-3">
+          Run research on this cluster to get AI-suggested answers.
+        </p>
+      ) : null}
 
       <div className="space-y-3">
         {OFFER_QUESTIONS.map((q, i) => (
