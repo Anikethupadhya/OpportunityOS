@@ -9,6 +9,13 @@ const SUBREDDITS = [
   "productivity",
   "smallbusiness",
   "webdev",
+  // Session 5 additions — practitioner communities that pay for tools, not dreamers.
+  // (smallbusiness was already present, so EtsySellers fills the 4th slot; Etsy is a
+  // first-line publishing target, and its sellers are operators with tool-shaped pain.)
+  "ecommerce",
+  "bookkeeping",
+  "projectmanagement",
+  "EtsySellers",
 ];
 
 const MAX_PER_SUBREDDIT = 200;
