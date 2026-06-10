@@ -51,23 +51,34 @@ const CANDIDATE_KEYWORDS = [
   "there has to be a better way",
 ];
 
-// Tier 2: strict product/opportunity intent — must also match at least one of these
+// Tier 2: strict product/opportunity intent — must also match at least one of these.
+// Session 5: tightened toward business-operator / client-facing pain. Each phrase below
+// is either a purchase signal, an explicit tool search, or a named workflow friction.
 const HIGH_INTENT_PHRASES = [
   "I'd pay for",
   "would pay for",
   "does anyone know a tool",
   "is there a tool",
-  "is there an app",
   "looking for a tool",
-  "looking for a way to",
-  "I wish there was",
-  "wish there was",
   "nobody has built",
   "why is there no",
-  "there has to be a better way",
-  "I need a way to",
-  "anyone else struggling with",
+  // Session 5 additions — anchored to a business workflow or client-facing operation:
+  "do this manually for every client",
+  "copy paste between",
+  "spreadsheet isn't cutting it",
+  "can't find a tool that does both",
+  "paying someone to do this every week",
 ];
+
+// Removed in Session 5 — each matched casual productivity / self-improvement posts that
+// are not anchored to a business workflow or client-facing operation:
+//   "is there an app"           — generic consumer app requests (e.g. habit/water trackers)
+//   "looking for a way to"      — matches personal self-improvement ("a way to wake up earlier")
+//   "I wish there was"          — dreamer phrasing, mostly non-commercial wishes
+//   "wish there was"            — same dreamer phrasing, no purchase or workflow anchor
+//   "there has to be a better way" — generic venting, not tied to a paid workflow
+//   "I need a way to"           — casual personal-goal phrasing, no business context
+//   "anyone else struggling with"  — generic complaint, not tool- or purchase-shaped
 
 interface RedditPost {
   title: string;
