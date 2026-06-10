@@ -75,7 +75,7 @@ Successful products inform future cluster scoring
 
 | Metric | Value |
 |--------|-------|
-| Subreddits active | 6 (→ 10 after Day 5) |
+| Subreddits active | 10 |
 | Clusters in DB | 6 |
 | Reviewed | 6 / 6 |
 | Would Build Rate | 0% |
