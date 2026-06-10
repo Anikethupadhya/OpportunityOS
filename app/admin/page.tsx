@@ -69,6 +69,34 @@ export default async function AdminPage() {
   const wouldNotBuildCount = clusterList.filter((c) => c.human_status === "would_not_build").length;
   const wouldBuildRate = reviewedCount > 0 ? (wouldBuildCount / reviewedCount) * 100 : null;
 
+  // WBR by source: a reviewed cluster counts toward every source that contributed a
+  // signal to it (mirrors COUNT(DISTINCT cluster) GROUP BY source_type). Tells us which
+  // source produces build-worthy opportunities so future sessions add more like it.
+  const clusterSources: Record<string, Set<string>> = {};
+  for (const opp of (clusterOpps ?? []) as Array<{
+    cluster_id: string;
+    source_type: string | null;
+  }>) {
+    const src = opp.source_type ?? "unknown";
+    (clusterSources[opp.cluster_id] ??= new Set()).add(src);
+  }
+  const sourceWbrMap: Record<string, { reviewed: number; wouldBuild: number }> = {};
+  for (const c of reviewedClusters) {
+    for (const src of clusterSources[c.id] ?? []) {
+      const entry = (sourceWbrMap[src] ??= { reviewed: 0, wouldBuild: 0 });
+      entry.reviewed++;
+      if (c.human_status === "would_build") entry.wouldBuild++;
+    }
+  }
+  const sourceWbr = Object.entries(sourceWbrMap)
+    .map(([source, { reviewed, wouldBuild }]) => ({
+      source,
+      reviewed,
+      wouldBuild,
+      wbr: reviewed > 0 ? (wouldBuild / reviewed) * 100 : 0,
+    }))
+    .sort((a, b) => b.wbr - a.wbr);
+
   // Block 2: rejection reason breakdown
   const rejectedClusters = clusterList.filter((c) => c.human_status === "would_not_build");
   const rejectionMap: Record<string, { count: number; totalSignals: number }> = {};
@@ -199,6 +227,35 @@ export default async function AdminPage() {
           <p className="text-xs text-muted-foreground">
             {wouldBuildCount} of {reviewedCount} reviewed marked Would Build
           </p>
+        </div>
+
+        {/* WBR by source */}
+        <div className="space-y-2 border-t pt-4">
+          <h3 className="text-sm font-semibold">WBR by Source</h3>
+          {sourceWbr.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No reviewed clusters yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b">
+                  <th className="text-left pb-2 font-medium">Source</th>
+                  <th className="text-right pb-2 font-medium">Reviewed</th>
+                  <th className="text-right pb-2 font-medium">Would Build</th>
+                  <th className="text-right pb-2 font-medium">WBR</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {sourceWbr.map((s) => (
+                  <tr key={s.source}>
+                    <td className="py-2 font-mono text-xs">{s.source}</td>
+                    <td className="py-2 text-right">{s.reviewed}</td>
+                    <td className="py-2 text-right">{s.wouldBuild}</td>
+                    <td className="py-2 text-right font-medium">{s.wbr.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
 
