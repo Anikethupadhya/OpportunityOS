@@ -23,13 +23,16 @@ export async function runClusteringPass(): Promise<{
   console.log("[clustering] pass started");
   const db = createServiceClient();
 
-  // Step 1 — find unprocessed signals
+  // Step 1 — find unprocessed signals.
+  // Viability gate (Session 6): only cluster signals Haiku scored at 50+. Low-viability
+  // signals produce vague clusters that get rejected, so we leave them unclustered.
   const { data: signals, error: fetchError } = await db
     .from("opportunities")
     .select("id, raw_problem_hint")
     .not("raw_problem_hint", "is", null)
     .is("cluster_id", null)
     .neq("status", "rejected")
+    .gte("viability_score", 50)
     .limit(100);
 
   if (fetchError) {
@@ -107,6 +110,15 @@ export async function runClusteringPass(): Promise<{
       if (!batchIds.has(result.id)) {
         console.warn(`[clustering] REJECTED id not in batch: ${result.id}`);
         failed++;
+        continue;
+      }
+
+      // Specificity floor (Session 6): skip vague clusters. Leave the opportunity
+      // unclustered (cluster_id stays null) so it can be re-evaluated if the prompt improves.
+      if (result.specificity < 3) {
+        console.log(
+          `[clustering] skipped low-specificity cluster: ${result.canonical_name} (specificity=${result.specificity})`
+        );
         continue;
       }
 
