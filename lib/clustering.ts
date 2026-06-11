@@ -3,7 +3,13 @@ import { logAiUsage } from "@/lib/ai-usage";
 import { createServiceClient } from "@/lib/db";
 import { CLUSTERING_SYSTEM_PROMPT } from "@/lib/prompts/clustering";
 
-const BATCH_SIZE = 25;
+// 10 per batch (was 25): keeps Sonnet's JSON under max_tokens so it never truncates
+// mid-string, and keeps per-request output reservation small enough to fit the org's
+// 4,000 output-tokens/min + 5 requests/min Sonnet rate limits.
+const BATCH_SIZE = 10;
+const BATCH_DELAY_MS = 20_000;
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function slugify(text: string): string {
   return text
@@ -53,6 +59,7 @@ export async function runClusteringPass(): Promise<{
 
   // Step 2 — batch and call Sonnet
   for (let i = 0; i < signals.length; i += BATCH_SIZE) {
+    if (i > 0) await delay(BATCH_DELAY_MS);
     const batch = signals.slice(i, i + BATCH_SIZE);
     const batchIds = new Set(batch.map((s) => s.id));
 
