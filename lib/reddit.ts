@@ -4,9 +4,12 @@ import { runClusteringPass } from "@/lib/clustering";
 
 const SUBREDDITS = [
   "freelance",
-  "Notion",
-  "ChatGPT",
-  "productivity",
+  // Session 9 swaps — Notion/ChatGPT/productivity removed (dreamers, not practitioners;
+  // corpus saturated). Replaced with operator communities that have tool-shaped pain.
+  // All three verified live via /new/.rss before committing.
+  "shopify",
+  "PPC",
+  "podcasting",
   "smallbusiness",
   "webdev",
   // Session 5 additions — practitioner communities that pay for tools, not dreamers.

@@ -13,6 +13,7 @@ interface ProblemCluster {
   reviewed_at: string | null;
   created_at: string | null;
   rejection_reason: string | null;
+  research_status: string | null;
 }
 
 interface ScanRun {
@@ -68,6 +69,11 @@ export default async function AdminPage() {
   const maybeCount = clusterList.filter((c) => c.human_status === "maybe").length;
   const wouldNotBuildCount = clusterList.filter((c) => c.human_status === "would_not_build").length;
   const wouldBuildRate = reviewedCount > 0 ? (wouldBuildCount / reviewedCount) * 100 : null;
+
+  // Research status summary for the Validation Gate block
+  const researchComplete = clusterList.filter((c) => c.research_status === "complete").length;
+  const researchFailed = clusterList.filter((c) => c.research_status === "failed").length;
+  const researchNotRun = clusterList.filter((c) => c.research_status === null).length;
 
   // WBR by source: a reviewed cluster counts toward every source that contributed a
   // signal to it (mirrors COUNT(DISTINCT cluster) GROUP BY source_type). Tells us which
@@ -228,6 +234,10 @@ export default async function AdminPage() {
             {wouldBuildCount} of {reviewedCount} reviewed marked Would Build
           </p>
         </div>
+
+        <p className="text-sm text-muted-foreground">
+          Research: {researchComplete} ready · {researchFailed} failed · {researchNotRun} not run
+        </p>
 
         {/* WBR by source */}
         <div className="space-y-2 border-t pt-4">

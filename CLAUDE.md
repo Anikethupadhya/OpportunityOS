@@ -79,9 +79,10 @@ Successful products inform future cluster scoring
 | Metric | Value |
 |--------|-------|
 | Signal sources | Reddit + Hacker News |
-| Subreddits active | 10 |
-| Clusters in DB | 6 |
-| Reviewed | 6 / 6 |
+| Subreddits active | 10 (Session 9: shopify/PPC/podcasting replaced Notion/ChatGPT/productivity) |
+| Clusters in DB | 64 |
+| Reviewed | 5 / 64 |
+| Research complete | 8 |
 | Would Build Rate | 0% |
 | Validation target | 30 reviewed clusters |
 | Revenue | $0 |
