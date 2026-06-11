@@ -6,11 +6,11 @@
     },
     {
       "path": "/api/cron/research",
-      "schedule": "0 * * * *"
+      "schedule": "0 */2 * * *"
     }
   ],
   "functions": {
     "app/api/cron/reddit/route.ts": { "maxDuration": 60 },
-    "app/api/cron/research/route.ts": { "maxDuration": 120 }
+    "app/api/cron/research/route.ts": { "maxDuration": 300 }
   }
 }

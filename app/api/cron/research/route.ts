@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/db";
 
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 // Researches every cluster that has never been researched (research_status IS NULL),
 // one at a time. Each cluster goes through POST /api/clusters/[id]/research, which
 // does the web-search call and owns its own pending/complete/failed status writes.
@@ -20,12 +22,17 @@ async function runResearch() {
     .select("id, canonical_name")
     .is("research_status", null)
     .order("created_at", { ascending: false })
-    .limit(10);
+    .limit(5);
 
   let succeeded = 0;
   let failed = 0;
 
+  let first = true;
   for (const cluster of clusters ?? []) {
+    // 35s gap between research calls — the web-search calls 429 against the org's
+    // Anthropic input-token/min limit when fired back to back.
+    if (!first) await delay(35_000);
+    first = false;
     try {
       const res = await fetch(`${baseUrl()}/api/clusters/${cluster.id}/research`, {
         method: "POST",

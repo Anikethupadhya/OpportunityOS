@@ -84,8 +84,11 @@ WHY_FAIL: [most likely reason this offer would not sell]`;
       model: BRIEF_MODEL,
       max_tokens: 4096,
       // SDK ^0.39.0 predates the web_search tool type, so cast past its Tool union.
+      // max_uses 3: every search iteration re-feeds the whole conversation as input
+      // tokens — uncapped runs hit ~220k input per call, which drains the org's
+      // 10k input-tokens/min Sonnet limit for 20+ minutes and 429s everything after.
       tools: [
-        { type: "web_search_20250305", name: "web_search" } as unknown as Anthropic.Tool,
+        { type: "web_search_20250305", name: "web_search", max_uses: 3 } as unknown as Anthropic.Tool,
       ],
       messages: [{ role: "user", content: userMessage }],
     });
